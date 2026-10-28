@@ -55,7 +55,7 @@ src/utils/             Small helpers (file extensions, file sizes, source locati
   `done` answer replaces it. Malformed or unknown events are skipped. A stream that ends
   without `done` or `error` shows a generic error. Answers can be cancelled.
 - Answers are rendered with `react-markdown` + `remark-gfm` with raw HTML skipped and
-  images not rendered. `[E12]` markers become clickable source chips only when the backend
+  images shown only for absolute http(s) URLs (lazy, no referrer). `[E12]` markers become clickable source chips only when the backend
   sent a matching citation; clicking one opens the source panel (file, page or sheet and
   range, snippet, and the full text from `GET /api/evidence/{id}`).
 - Error messages shown to users come from the contract's safe `message` field or from

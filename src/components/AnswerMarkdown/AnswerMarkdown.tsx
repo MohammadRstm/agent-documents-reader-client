@@ -16,15 +16,17 @@ interface AnswerMarkdownProps {
 
 const REMARK_PLUGINS = [remarkGfm, remarkCitationMarkers];
 
-// Images are not rendered: an image URL in model output could be used to send data
-// to a third-party server as soon as the answer is displayed.
-const DISALLOWED_ELEMENTS = ["img"];
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
 
 /**
  * Renders an answer as Markdown without ever interpreting raw HTML (`skipHtml`, no
  * rehype-raw). react-markdown's default URL transform removes unsafe link protocols
- * such as `javascript:`. Citation markers only become clickable when the backend
- * supplied a matching citation; unknown markers are shown as plain text.
+ * such as `javascript:`. Images are shown only for absolute http(s) URLs (otherwise
+ * their alt text), load lazily and send no referrer. Citation markers only become
+ * clickable when the backend supplied a matching citation; unknown markers are shown
+ * as plain text.
  */
 export function AnswerMarkdown({ content, citations, onCitationClick }: AnswerMarkdownProps) {
   const components = useMemo<Components>(() => {
@@ -47,17 +49,18 @@ export function AnswerMarkdown({ content, citations, onCitationClick }: AnswerMa
           </a>
         );
       },
+      img({ src, alt, title }) {
+        if (typeof src !== "string" || !isHttpUrl(src)) {
+          return alt ? <span>{alt}</span> : null;
+        }
+        return <img src={src} alt={alt ?? ""} title={title} referrerPolicy="no-referrer" loading="lazy" />;
+      },
     };
   }, [citations, onCitationClick]);
 
   return (
     <div className={styles.markdown}>
-      <Markdown
-        remarkPlugins={REMARK_PLUGINS}
-        components={components}
-        disallowedElements={DISALLOWED_ELEMENTS}
-        skipHtml
-      >
+      <Markdown remarkPlugins={REMARK_PLUGINS} components={components} skipHtml>
         {content}
       </Markdown>
     </div>
