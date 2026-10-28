@@ -128,7 +128,11 @@ export async function toApiError(response: Response): Promise<ApiError> {
   let body: unknown = null;
   try {
     body = await response.json();
-  } catch {
+  } catch (error) {
+    // A cancelled request must stay recognisable as cancelled, not become an API error.
+    if (isAbortError(error)) {
+      throw error;
+    }
     // Not JSON (for example a proxy error page). Fall through to the generic message.
   }
 

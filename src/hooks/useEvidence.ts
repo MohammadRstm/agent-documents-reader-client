@@ -43,7 +43,7 @@ export function useEvidence(
     getEvidence(sessionId, evidenceId, controller.signal)
       .then((evidence) => setState({ status: "loaded", evidence }))
       .catch((error: unknown) => {
-        if (isAbortError(error)) {
+        if (controller.signal.aborted || isAbortError(error)) {
           return;
         }
         if (isApiError(error) && error.code === "session_not_found") {

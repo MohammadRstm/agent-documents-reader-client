@@ -91,7 +91,7 @@ export function useChat(
         setIsHistoryLoading(false);
       })
       .catch((error: unknown) => {
-        if (isAbortError(error)) {
+        if (controller.signal.aborted || isAbortError(error)) {
           return;
         }
         setIsHistoryLoading(false);
