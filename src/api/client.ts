@@ -1,0 +1,270 @@
+import type {
+  ApiErrorCode,
+  ApiErrorResponse,
+  CreateSessionResponse,
+  DocumentsResponse,
+  EvidenceDetail,
+} from "./types";
+
+const API_BASE_PATH = "/api";
+const SESSION_HEADER = "X-Session-Id";
+
+/** Session IDs issued by the server are 43-character base64url strings. */
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+const KNOWN_API_ERROR_CODES: readonly ApiErrorCode[] = [
+  "validation_failed",
+  "session_required",
+  "session_not_found",
+  "evidence_not_found",
+  "question_in_progress",
+  "payload_too_large",
+  "unsupported_media_type",
+  "rate_limited",
+  "provider_unavailable",
+  "internal_error",
+];
+
+/**
+ * Codes produced by the client itself when no contract error body is available:
+ * - `network_error`: the server could not be reached.
+ * - `unexpected_response`: the server answered with something that is not the
+ *   contract shape (for example an HTML proxy error page or malformed JSON).
+ */
+export type ClientErrorCode = "network_error" | "unexpected_response";
+
+export class ApiError extends Error {
+  readonly code: ApiErrorCode | ClientErrorCode;
+  /** HTTP status, or 0 when no response was received. */
+  readonly status: number;
+  readonly traceId: string | null;
+  readonly details: Record<string, string[]> | null;
+
+  constructor(options: {
+    code: ApiErrorCode | ClientErrorCode;
+    status: number;
+    message: string;
+    traceId?: string | null;
+    details?: Record<string, string[]> | null;
+  }) {
+    super(options.message);
+    this.name = "ApiError";
+    this.code = options.code;
+    this.status = options.status;
+    this.traceId = options.traceId ?? null;
+    this.details = options.details ?? null;
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof ApiError;
+}
+
+/** True when a request was cancelled through an AbortSignal. */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+export function isValidSessionId(value: unknown): value is string {
+  return typeof value === "string" && SESSION_ID_PATTERN.test(value);
+}
+
+/**
+ * Returns a message that is safe to show to the user. Contract error messages are
+ * documented as safe; anything else is replaced with a generic message so that
+ * internals (stack traces, proxy pages, exception text) never reach the UI.
+ */
+export function getUserFacingErrorMessage(error: unknown): string {
+  if (isApiError(error)) {
+    return error.message;
+  }
+  return "Something went wrong. Please try again.";
+}
+
+function genericMessageForStatus(status: number): string {
+  if (status === 413) {
+    return "The request is too large. Try uploading fewer or smaller files.";
+  }
+  if (status === 429) {
+    return "Too many requests. Please wait a moment and try again.";
+  }
+  if (status >= 500) {
+    return "The server could not complete the request. Please try again.";
+  }
+  return "The request could not be completed. Please try again.";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isErrorDetails(value: unknown): value is Record<string, string[]> {
+  return (
+    isRecord(value) &&
+    Object.values(value).every(
+      (messages) => Array.isArray(messages) && messages.every((message) => typeof message === "string"),
+    )
+  );
+}
+
+function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
+  return (
+    isRecord(value) &&
+    typeof value.code === "string" &&
+    (KNOWN_API_ERROR_CODES as readonly string[]).includes(value.code) &&
+    typeof value.message === "string" &&
+    value.message.trim().length > 0 &&
+    typeof value.traceId === "string" &&
+    (value.details === undefined || value.details === null || isErrorDetails(value.details))
+  );
+}
+
+/** Converts a non-2xx response into an ApiError, using the contract body when present. */
+export async function toApiError(response: Response): Promise<ApiError> {
+  let body: unknown = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Not JSON (for example a proxy error page). Fall through to the generic message.
+  }
+
+  if (isApiErrorResponse(body)) {
+    return new ApiError({
+      code: body.code,
+      status: response.status,
+      message: body.message,
+      traceId: body.traceId,
+      details: body.details ?? null,
+    });
+  }
+
+  return new ApiError({
+    code: "unexpected_response",
+    status: response.status,
+    message: genericMessageForStatus(response.status),
+  });
+}
+
+interface RequestOptions {
+  method?: "GET" | "POST";
+  /** Required for every endpoint except `POST /api/sessions`. */
+  sessionId?: string;
+  body?: BodyInit;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+/**
+ * Sends a request to the API and returns the successful Response.
+ * Throws ApiError for network failures and non-2xx responses.
+ * Abort errors are rethrown unchanged so callers can ignore them (see isAbortError).
+ */
+export async function sendApiRequest(path: string, options: RequestOptions = {}): Promise<Response> {
+  const headers = new Headers(options.headers);
+  if (options.sessionId !== undefined) {
+    headers.set(SESSION_HEADER, options.sessionId);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_PATH}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body: options.body,
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+    throw new ApiError({
+      code: "network_error",
+      status: 0,
+      message: "Could not reach the server. Check your connection and try again.",
+    });
+  }
+
+  if (!response.ok) {
+    throw await toApiError(response);
+  }
+  return response;
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+    throw new ApiError({
+      code: "unexpected_response",
+      status: response.status,
+      message: "The server returned an unexpected response. Please try again.",
+    });
+  }
+}
+
+function unexpectedResponse(status: number): ApiError {
+  return new ApiError({
+    code: "unexpected_response",
+    status,
+    message: "The server returned an unexpected response. Please try again.",
+  });
+}
+
+function assertDocumentsResponse(value: unknown, status: number): DocumentsResponse {
+  if (!isRecord(value) || !Array.isArray(value.documents)) {
+    throw unexpectedResponse(status);
+  }
+  return value as unknown as DocumentsResponse;
+}
+
+// ---------------------------------------------------------------------------
+// Endpoints
+// ---------------------------------------------------------------------------
+
+/** `POST /api/sessions` (no X-Session-Id header). */
+export async function createSession(signal?: AbortSignal): Promise<CreateSessionResponse> {
+  const response = await sendApiRequest("/sessions", { method: "POST", signal });
+  const body = await readJson(response);
+  if (!isRecord(body) || !isValidSessionId(body.sessionId) || typeof body.createdAt !== "string") {
+    throw unexpectedResponse(response.status);
+  }
+  return { sessionId: body.sessionId, createdAt: body.createdAt };
+}
+
+/** `GET /api/documents` */
+export async function listDocuments(sessionId: string, signal?: AbortSignal): Promise<DocumentsResponse> {
+  const response = await sendApiRequest("/documents", { sessionId, signal });
+  return assertDocumentsResponse(await readJson(response), response.status);
+}
+
+/** `POST /api/documents` with one `files` part per file. */
+export async function uploadDocuments(
+  sessionId: string,
+  files: readonly File[],
+  signal?: AbortSignal,
+): Promise<DocumentsResponse> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append("files", file, file.name);
+  }
+  // Content-Type is intentionally not set: the browser adds the multipart boundary.
+  const response = await sendApiRequest("/documents", { method: "POST", sessionId, body: formData, signal });
+  return assertDocumentsResponse(await readJson(response), response.status);
+}
+
+/** `GET /api/evidence/{evidenceId}` */
+export async function getEvidence(
+  sessionId: string,
+  evidenceId: string,
+  signal?: AbortSignal,
+): Promise<EvidenceDetail> {
+  const response = await sendApiRequest(`/evidence/${encodeURIComponent(evidenceId)}`, { sessionId, signal });
+  const body = await readJson(response);
+  if (!isRecord(body) || typeof body.evidenceId !== "string" || typeof body.text !== "string") {
+    throw unexpectedResponse(response.status);
+  }
+  return body as unknown as EvidenceDetail;
+}
