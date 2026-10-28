@@ -20,6 +20,8 @@ interface ChatPanelProps {
   onCitationClick: (citation: Citation) => void;
   /** True while no session is available. */
   disabled: boolean;
+  /** Why questions cannot be asked yet (documents processing, none readable); null when allowed. */
+  blockedReason: string | null;
 }
 
 export function ChatPanel({
@@ -35,9 +37,11 @@ export function ChatPanel({
   onCancel,
   onCitationClick,
   disabled,
+  blockedReason,
 }: ChatPanelProps) {
   const [question, setQuestion] = useState("");
-  const canSend = !disabled && !isStreaming && !isHistoryLoading && question.trim().length > 0;
+  const isInputDisabled = disabled || blockedReason !== null;
+  const canSend = !isInputDisabled && !isStreaming && !isHistoryLoading && question.trim().length > 0;
 
   async function submitQuestion() {
     if (!canSend) {
@@ -83,6 +87,11 @@ export function ChatPanel({
       {notice && <ErrorBanner variant={notice.variant} message={notice.message} onDismiss={onDismissNotice} />}
 
       <form className={styles.form} onSubmit={handleSubmit}>
+        {blockedReason !== null && (
+          <p id="chat-blocked-reason" className={styles.blockedReason}>
+            {blockedReason}
+          </p>
+        )}
         <label htmlFor="chat-question" className={styles.visuallyHidden}>
           Your question
         </label>
@@ -95,7 +104,8 @@ export function ChatPanel({
           maxLength={MAX_QUESTION_LENGTH}
           rows={3}
           placeholder="Ask a question about your documents…"
-          disabled={disabled}
+          disabled={isInputDisabled}
+          aria-describedby={blockedReason !== null ? "chat-blocked-reason" : undefined}
         />
         <div className={styles.actions}>
           {isStreaming && (

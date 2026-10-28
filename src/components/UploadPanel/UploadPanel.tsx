@@ -1,16 +1,16 @@
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import type { FileUpload } from "../../hooks/useDocuments";
 import { SUPPORTED_FILE_EXTENSIONS, hasSupportedExtension } from "../../utils/files";
 import { ErrorBanner } from "../ErrorBanner/ErrorBanner";
+import { UploadProgressList } from "../UploadProgressList/UploadProgressList";
 import styles from "./UploadPanel.module.css";
 
 interface UploadPanelProps {
   onUpload: (files: File[]) => void;
-  isUploading: boolean;
-  /** True while no session is available. */
+  /** True while no session is available. Uploading more files while others are in progress is allowed. */
   disabled: boolean;
-  /** Safe message from the last failed upload request. */
-  error: string | null;
-  onDismissError: () => void;
+  uploads: FileUpload[];
+  onDismissUpload: (uploadId: string) => void;
 }
 
 const ACCEPT_ATTRIBUTE = SUPPORTED_FILE_EXTENSIONS.join(",");
@@ -20,11 +20,10 @@ function describeSkippedFiles(fileNames: string[]): string {
   return `Skipped ${subject} not PDF or Excel: ${fileNames.join(", ")}`;
 }
 
-export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissError }: UploadPanelProps) {
+export function UploadPanel({ onUpload, disabled, uploads, onDismissUpload }: UploadPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [skippedFileNames, setSkippedFileNames] = useState<string[]>([]);
-  const isBlocked = disabled || isUploading;
 
   function handleFiles(fileList: FileList | readonly File[]) {
     const files = Array.from(fileList);
@@ -48,7 +47,7 @@ export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissE
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    if (!isBlocked) {
+    if (!disabled) {
       setIsDragActive(true);
     }
   }
@@ -64,7 +63,7 @@ export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissE
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragActive(false);
-    if (!isBlocked) {
+    if (!disabled) {
       handleFiles(event.dataTransfer.files);
     }
   }
@@ -72,7 +71,7 @@ export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissE
   const dropZoneClassName = [
     styles.dropZone,
     isDragActive ? styles.dropZoneActive : "",
-    isBlocked ? styles.dropZoneDisabled : "",
+    disabled ? styles.dropZoneDisabled : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -95,7 +94,7 @@ export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissE
           type="button"
           className={styles.chooseButton}
           onClick={() => inputRef.current?.click()}
-          disabled={isBlocked}
+          disabled={disabled}
         >
           Choose files
         </button>
@@ -107,17 +106,13 @@ export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissE
           accept={ACCEPT_ATTRIBUTE}
           className={styles.hiddenInput}
           onChange={handleInputChange}
-          disabled={isBlocked}
+          disabled={disabled}
           aria-label="Choose files to upload"
           data-testid="upload-input"
         />
       </div>
 
-      {isUploading && (
-        <p className={styles.progress} role="status">
-          Uploading and processing files…
-        </p>
-      )}
+      <UploadProgressList uploads={uploads} onDismiss={onDismissUpload} />
 
       {skippedFileNames.length > 0 && (
         <ErrorBanner
@@ -126,8 +121,6 @@ export function UploadPanel({ onUpload, isUploading, disabled, error, onDismissE
           onDismiss={() => setSkippedFileNames([])}
         />
       )}
-
-      {error && <ErrorBanner message={error} onDismiss={onDismissError} />}
     </section>
   );
 }

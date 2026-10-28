@@ -2,7 +2,13 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { ChatMessage, Citation } from "../api/types";
 import { createControlledSseStream, jsonResponse, type ControlledSseStream } from "../test/sseTestUtils";
-import { ANSWER_CANCELLED_MESSAGE, STREAM_INTERRUPTED_MESSAGE, useChat } from "./useChat";
+import {
+  ANSWER_CANCELLED_MESSAGE,
+  DOCUMENTS_PROCESSING_MESSAGE,
+  NO_DOCUMENTS_MESSAGE,
+  STREAM_INTERRUPTED_MESSAGE,
+  useChat,
+} from "./useChat";
 
 const SESSION_ID = "s".repeat(43);
 
@@ -283,5 +289,23 @@ describe("useChat", () => {
     await act(async () => {
       await firstSend;
     });
+  });
+
+  it.each([
+    ["documents_processing", "Documents are still processing.", DOCUMENTS_PROCESSING_MESSAGE],
+    ["no_documents", "No readable documents.", NO_DOCUMENTS_MESSAGE],
+  ])("shows a friendly message for a pre-stream 409 %s and returns the question", async (code, serverMessage, expected) => {
+    chatResponse = jsonResponse({ code, message: serverMessage, traceId: "t" }, 409);
+    const { result } = await renderChat();
+
+    let accepted: boolean | undefined;
+    await act(async () => {
+      accepted = await result.current.send("What is the total?");
+    });
+
+    expect(accepted).toBe(false);
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.notice).toEqual({ variant: "error", message: expected });
+    expect(result.current.isStreaming).toBe(false);
   });
 });

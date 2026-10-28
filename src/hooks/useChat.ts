@@ -5,6 +5,7 @@ import {
   isAbortError,
   isApiError,
   streamChat,
+  type ApiError,
 } from "../api/client";
 import type { ChatMessage, ChatStreamEvent, Citation } from "../api/types";
 
@@ -13,6 +14,15 @@ export const MAX_QUESTION_LENGTH = 4000;
 
 export const STREAM_INTERRUPTED_MESSAGE = "The answer was interrupted before it finished. Please try again.";
 export const ANSWER_CANCELLED_MESSAGE = "You cancelled the answer.";
+
+/** Client wording for pre-stream rejections that the user can resolve themselves. */
+const PRE_STREAM_MESSAGES: Partial<Record<ApiError["code"], string>> = {
+  documents_processing: "Your documents are still being processed. You can ask once processing finishes.",
+  no_documents: "There are no readable documents yet. Upload at least one readable PDF or Excel file first.",
+};
+
+export const DOCUMENTS_PROCESSING_MESSAGE = PRE_STREAM_MESSAGES.documents_processing;
+export const NO_DOCUMENTS_MESSAGE = PRE_STREAM_MESSAGES.no_documents;
 
 /** The answer currently being streamed. */
 export interface PendingAnswer {
@@ -225,7 +235,7 @@ export function useChat(
           if (error.code === "session_not_found") {
             onSessionNotFoundRef.current(sessionId);
           } else {
-            setNotice({ variant: "error", message: error.message });
+            setNotice({ variant: "error", message: PRE_STREAM_MESSAGES[error.code] ?? error.message });
           }
           return false;
         }

@@ -64,3 +64,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+.blockedReason {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}

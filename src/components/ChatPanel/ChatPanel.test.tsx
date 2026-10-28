@@ -19,6 +19,7 @@ function renderPanel(overrides: Partial<ChatPanelProps> = {}) {
     onCancel: vi.fn(),
     onCitationClick: vi.fn(),
     disabled: false,
+    blockedReason: null,
     ...overrides,
   };
   const { container } = render(<ChatPanel {...props} />);
@@ -109,5 +110,46 @@ describe("ChatPanel", () => {
     renderPanel({ notice: { variant: "error", message: "Too many requests. Please wait a moment and try again." } });
 
     expect(screen.getByRole("alert")).toHaveTextContent("Too many requests.");
+  });
+
+  it("blocks asking and explains why while documents are processing, then re-enables", async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn(async () => true);
+    const baseProps: Parameters<typeof ChatPanel>[0] = {
+      messages: [],
+      pendingAnswer: null,
+      isHistoryLoading: false,
+      historyError: null,
+      onReloadHistory: vi.fn(),
+      isStreaming: false,
+      notice: null,
+      onDismissNotice: vi.fn(),
+      onSend,
+      onCancel: vi.fn(),
+      onCitationClick: vi.fn(),
+      disabled: false,
+      blockedReason: "Processing 2 files… you can ask once processing finishes.",
+    };
+    const { rerender } = render(<ChatPanel {...baseProps} />);
+    const input = screen.getByLabelText("Your question");
+
+    expect(screen.getByText("Processing 2 files… you can ask once processing finishes.")).toBeInTheDocument();
+    expect(input).toBeDisabled();
+    expect(input).toHaveAccessibleDescription("Processing 2 files… you can ask once processing finishes.");
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+
+    rerender(<ChatPanel {...baseProps} blockedReason={null} />);
+
+    expect(input).toBeEnabled();
+    expect(screen.queryByText(/you can ask once processing finishes/)).not.toBeInTheDocument();
+    await user.type(input, "What is the total?{Enter}");
+    expect(onSend).toHaveBeenCalledWith("What is the total?");
+  });
+
+  it("explains that a readable document is needed before asking", () => {
+    renderPanel({ blockedReason: "Upload at least one readable PDF or Excel file to start asking." });
+
+    expect(screen.getByText("Upload at least one readable PDF or Excel file to start asking.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Your question")).toBeDisabled();
   });
 });

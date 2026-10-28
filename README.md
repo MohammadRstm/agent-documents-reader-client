@@ -59,17 +59,17 @@ Tests use mocked `fetch` responses and never call the server or Claude.
 docs/api-contract.md        Shared API contract (identical copy in the server repository)
 src/api/
   types.ts                  TypeScript mirror of the contract types
-  client.ts                 fetch wrapper: X-Session-Id header, typed ApiError, endpoint functions
+  client.ts                 fetch wrapper and XHR upload: X-Session-Id header, typed ApiError, endpoint functions
   sse.ts                    Server-sent-event parser for the streaming chat response
 src/hooks/
   useSession.ts             Session ID in sessionStorage, expiry handling
-  useDocuments.ts           Document list and uploads
+  useDocuments.ts           Document list, parallel per-file uploads and their progress
   useChat.ts                Chat history, streaming answers, cancellation
   useEvidence.ts            Full source text for the source panel
 src/components/
-  UploadPanel, DocumentList, ChatPanel, MessageList, MessageItem,
+  UploadPanel, UploadProgressList, DocumentList, ChatPanel, MessageList, MessageItem,
   AnswerMarkdown, CitationChip, SourcePanel, ErrorBanner
-src/utils/                  Small helpers (file extensions and sizes, source locations)
+src/utils/                  Small helpers (file extensions and sizes, source locations, chat gating)
 src/test/                   Test setup and SSE test helpers
 ```
 
@@ -98,24 +98,43 @@ A contract change must be made in both repositories in the same step, including 
   `.xlsm` and `.xls`.
 - Files with other extensions are skipped and listed in a notice. This check is only a
   convenience; the server validates every file's signature and content.
-- While a batch uploads and is processed, the panel shows "Uploading and processing files…"
-  and accepts no new files.
-- Each document shows its type, size, page count or sheet names, a status badge, and any
-  warnings from the server:
+- Each file is sent as its own `POST /api/documents` request, and all of them run in
+  parallel. The requests use `XMLHttpRequest`, because `fetch` cannot report upload progress.
+- Each file gets a row that goes through these states:
+  - a progress bar with a percentage while its bytes are sent;
+  - an animated "Parsing…" bar while the server processes it;
+  - when it finishes, the row disappears and the document appears in the document list.
+  The bars are accessible: the upload bar is a `progressbar` with `aria-valuenow`, and the
+  parsing bar is indeterminate with `aria-busy`.
+- If a request fails as a whole (network error, 413, 429 and similar), that file's row shows
+  "Upload failed." with the reason and a **Dismiss** button. If the session has expired,
+  the usual expiry notice appears instead.
+- More files can be added while earlier ones are still uploading or parsing.
+- Each document shows its type, size, page count or sheet names, a status badge, a short
+  explanation of what the user can do, and any warnings from the server:
 
-| Status | Badge |
-|---|---|
-| `indexed` | Indexed |
-| `partiallyIndexed` | Partially indexed (some content could not be read) |
-| `noTextExtracted` | No text found (the PDF may be scanned) |
-| `empty` | Empty |
-| `unsupported` | Unsupported |
-| `corrupt` | Unreadable (damaged, encrypted or unopenable) |
-| `tooLarge` | Too large |
+| Status | Badge | Explanation shown |
+|---|---|---|
+| `indexed` | Indexed | none |
+| `partiallyIndexed` | Partially indexed | Some pages or sheets could not be read or were cut off; answers may miss part of the document |
+| `noTextExtracted` | No text found | The PDF looks scanned; OCR is not supported, so upload a PDF with selectable text |
+| `empty` | Empty | Nothing to analyse; check that it is the right file |
+| `unsupported` | Unsupported | Only PDF and Excel files (.pdf, .xlsx, .xlsm, .xls) are supported |
+| `corrupt` | Unreadable | Damaged, password-protected or unopenable; re-export or re-save it without a password |
+| `tooLarge` | Too large | Split it into smaller files or remove unneeded pages or sheets |
 
 ### Asking questions
 
 - Enter sends; Shift+Enter inserts a new line. Questions can be 1 to 4000 characters.
+- The question box and **Send** are disabled until asking makes sense, with a hint below.
+  They re-enable automatically.
+  - While any file is uploading or parsing: "Processing N files… you can ask once
+    processing finishes."
+  - While the document list loads: "Loading documents…".
+  - While no document is `indexed` or `partiallyIndexed`: "Upload at least one readable PDF
+    or Excel file to start asking."
+- The server enforces the same rules. It answers `409 documents_processing` or
+  `409 no_documents`, and the client shows a friendly message for each.
 - `POST /api/chat` returns a server-sent-event stream, read from `fetch` because
   `EventSource` cannot POST.
   - `status` events update a progress line, such as "Searching documents…".
@@ -126,7 +145,8 @@ A contract change must be made in both repositories in the same step, including 
 - If the stream ends without `done` or `error`, a generic "interrupted" error is shown.
 - Send is disabled while an answer streams. **Cancel** stops reading the answer.
 - If the server rejects a question before streaming starts (validation, a question already
-  in progress, rate limit, provider failure), the question is removed from the chat and
+  in progress, documents still processing, no readable documents, rate limit, provider
+  failure), the question is removed from the chat and
   its text goes back into the input box.
 - Answers flagged `incomplete` (the agent hit a processing limit) show a note that the
   answer may be incomplete.
@@ -176,8 +196,10 @@ Follow-up questions in the same conversation can refer to earlier answers.
 - **Cancel is client-side only.** The browser stops reading, but the server may finish the
   answer and store it; it can then appear in history after a reload.
 - **No client-side size or count limits.** The server enforces them and reports `tooLarge`
-  per file or `payload_too_large` for the whole request.
-- **One upload at a time.** The panel is disabled until the current batch finishes.
+  per file or `payload_too_large` for a request. Each file is its own request, so the client
+  does not limit how many run in parallel; the server bounds parsing concurrency.
+- **Uploads cannot be cancelled from the UI.** They are aborted only when the session
+  changes or the page closes. A failed file must be selected again; there is no retry button.
 - **The source panel is cramped in narrow windows.** It opens as a third column; below
   720 px the layout stacks into one column.
 - **`traceId` is not shown.** Error trace IDs are kept on `ApiError` but not displayed.
@@ -187,7 +209,7 @@ Follow-up questions in the same conversation can refer to earlier answers.
 
 | Symptom | Likely cause and fix |
 |---|---|
-| "Could not start a session" with a generic server error, and `http proxy error ... ECONNREFUSED` in the Vite terminal | The server is not running on port 5080. Start it, then click **Try again**. |
+| "Could not start a session. The server could not complete the request." (the Vite proxy answers 502 without a contract body) and a proxy error in the Vite terminal | The server is not running on port 5080. Start it, then click **Try again**. |
 | "Could not reach the server. Check your connection and try again." | The Vite dev server itself is unreachable, or the network failed. Restart `npm run dev`. |
 | Questions fail with a provider error (HTTP 502 `provider_unavailable`) | Claude could not be reached, usually because the server has no API key in its User Secrets, or the key is invalid. Configure it on the server and restart it. |
 | The expired-session notice appears and documents disappear | The server restarted and lost its in-memory sessions. Upload the documents again. |

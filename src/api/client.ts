@@ -6,6 +6,7 @@ import type {
   ChatRequest,
   ChatStreamEvent,
   CreateSessionResponse,
+  DocumentSummary,
   DocumentsResponse,
   EvidenceDetail,
 } from "./types";
@@ -22,6 +23,8 @@ const KNOWN_API_ERROR_CODES: readonly ApiErrorCode[] = [
   "session_not_found",
   "evidence_not_found",
   "question_in_progress",
+  "documents_processing",
+  "no_documents",
   "payload_too_large",
   "unsupported_media_type",
   "rate_limited",
@@ -123,6 +126,35 @@ function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   );
 }
 
+/**
+ * Builds the ApiError for a non-2xx response from its status and parsed body (or null
+ * when the body was not JSON). Shared by the fetch and XMLHttpRequest paths.
+ */
+function apiErrorFromBody(status: number, body: unknown): ApiError {
+  if (isApiErrorResponse(body)) {
+    return new ApiError({
+      code: body.code,
+      status,
+      message: body.message,
+      traceId: body.traceId,
+      details: body.details ?? null,
+    });
+  }
+  return new ApiError({
+    code: "unexpected_response",
+    status,
+    message: genericMessageForStatus(status),
+  });
+}
+
+function networkError(): ApiError {
+  return new ApiError({
+    code: "network_error",
+    status: 0,
+    message: "Could not reach the server. Check your connection and try again.",
+  });
+}
+
 /** Converts a non-2xx response into an ApiError, using the contract body when present. */
 export async function toApiError(response: Response): Promise<ApiError> {
   let body: unknown = null;
@@ -135,22 +167,7 @@ export async function toApiError(response: Response): Promise<ApiError> {
     }
     // Not JSON (for example a proxy error page). Fall through to the generic message.
   }
-
-  if (isApiErrorResponse(body)) {
-    return new ApiError({
-      code: body.code,
-      status: response.status,
-      message: body.message,
-      traceId: body.traceId,
-      details: body.details ?? null,
-    });
-  }
-
-  return new ApiError({
-    code: "unexpected_response",
-    status: response.status,
-    message: genericMessageForStatus(response.status),
-  });
+  return apiErrorFromBody(response.status, body);
 }
 
 interface RequestOptions {
@@ -185,11 +202,7 @@ export async function sendApiRequest(path: string, options: RequestOptions = {})
     if (isAbortError(error)) {
       throw error;
     }
-    throw new ApiError({
-      code: "network_error",
-      status: 0,
-      message: "Could not reach the server. Check your connection and try again.",
-    });
+    throw networkError();
   }
 
   if (!response.ok) {
@@ -248,19 +261,72 @@ export async function listDocuments(sessionId: string, signal?: AbortSignal): Pr
   return assertDocumentsResponse(await readJson(response), response.status);
 }
 
-/** `POST /api/documents` with one `files` part per file. */
-export async function uploadDocuments(
+export interface UploadDocumentOptions {
+  /** Called with the fraction (0 to 1) of the file's bytes sent so far; 1 once all are sent. */
+  onUploadProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * `POST /api/documents` for a single file (one `files` part); returns its summary.
+ * Uses XMLHttpRequest because fetch cannot report upload progress. Errors are mapped
+ * exactly like the fetch path; cancelling `signal` rejects with an AbortError.
+ */
+export function uploadDocument(
   sessionId: string,
-  files: readonly File[],
-  signal?: AbortSignal,
-): Promise<DocumentsResponse> {
-  const formData = new FormData();
-  for (const file of files) {
+  file: File,
+  options: UploadDocumentOptions = {},
+): Promise<DocumentSummary> {
+  const { onUploadProgress, signal } = options;
+
+  return new Promise<DocumentSummary>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("The upload was aborted.", "AbortError"));
+      return;
+    }
+
+    const request = new XMLHttpRequest();
+    const abortRequest = () => request.abort();
+
+    request.open("POST", `${API_BASE_PATH}/documents`);
+    request.setRequestHeader(SESSION_HEADER, sessionId);
+    // Content-Type is intentionally not set: the browser adds the multipart boundary.
+
+    // Upload listeners must be attached before send().
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        onUploadProgress?.(Math.min(event.loaded / event.total, 1));
+      }
+    };
+    request.upload.onload = () => onUploadProgress?.(1);
+
+    request.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(request.responseText);
+      } catch {
+        // Not JSON; handled below.
+      }
+      if (request.status < 200 || request.status >= 300) {
+        reject(apiErrorFromBody(request.status, body));
+        return;
+      }
+      if (!isRecord(body) || !Array.isArray(body.documents) || body.documents.length !== 1) {
+        reject(unexpectedResponse(request.status));
+        return;
+      }
+      resolve(body.documents[0] as DocumentSummary);
+    };
+    request.onerror = () => reject(networkError());
+    request.ontimeout = () => reject(networkError());
+    request.onabort = () => reject(new DOMException("The upload was aborted.", "AbortError"));
+    request.onloadend = () => signal?.removeEventListener("abort", abortRequest);
+    signal?.addEventListener("abort", abortRequest);
+
+    const formData = new FormData();
     formData.append("files", file, file.name);
-  }
-  // Content-Type is intentionally not set: the browser adds the multipart boundary.
-  const response = await sendApiRequest("/documents", { method: "POST", sessionId, body: formData, signal });
-  return assertDocumentsResponse(await readJson(response), response.status);
+    request.send(formData);
+  });
 }
 
 /** `GET /api/evidence/{evidenceId}` */

@@ -4,9 +4,28 @@ import {
   isAbortError,
   isApiError,
   listDocuments,
-  uploadDocuments,
+  uploadDocument,
 } from "../api/client";
-import type { DocumentSummary } from "../api/types";
+import type { DocumentStatus, DocumentSummary } from "../api/types";
+
+/**
+ * One file sent with its own `POST /api/documents` request.
+ * - `uploading`: bytes are being sent; `progress` is 0 to 1.
+ * - `processing`: all bytes sent, waiting for the server to parse the file.
+ * - `failed`: the request failed as a whole; `error` is a safe message.
+ * A successful upload is removed from the list and its document appears in `documents`.
+ */
+export interface FileUpload {
+  id: string;
+  fileName: string;
+  sizeBytes: number;
+  phase: "uploading" | "processing" | "failed";
+  progress: number;
+  error: string | null;
+}
+
+/** Statuses whose content can be searched, so questions can be asked about them. */
+const READABLE_STATUSES: readonly DocumentStatus[] = ["indexed", "partiallyIndexed"];
 
 export interface UseDocumentsResult {
   documents: DocumentSummary[];
@@ -14,11 +33,15 @@ export interface UseDocumentsResult {
   /** Safe message when the document list could not be loaded. */
   loadError: string | null;
   reload: () => void;
-  isUploading: boolean;
-  /** Safe message when the last upload request failed as a whole. */
-  uploadError: string | null;
-  dismissUploadError: () => void;
-  upload: (files: File[]) => Promise<void>;
+  uploads: FileUpload[];
+  /** Number of files still uploading or being processed by the server. */
+  processingCount: number;
+  /** True when at least one document is indexed or partially indexed. */
+  hasReadableDocuments: boolean;
+  /** Starts one upload request per file, all in parallel. */
+  upload: (files: File[]) => void;
+  /** Removes a failed upload row. */
+  dismissUpload: (uploadId: string) => void;
 }
 
 /** Appends documents that are not already present, keeping the existing order. */
@@ -43,9 +66,9 @@ export function useDocuments(
   const [isLoading, setIsLoading] = useState(sessionId !== null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const uploadControllerRef = useRef<AbortController | null>(null);
+  const [uploads, setUploads] = useState<FileUpload[]>([]);
+  const uploadControllersRef = useRef(new Map<string, AbortController>());
+  const uploadCountRef = useRef(0);
 
   // Kept in a ref so a new callback identity does not trigger a reload.
   const onSessionNotFoundRef = useRef(onSessionNotFound);
@@ -61,10 +84,9 @@ export function useDocuments(
     setIsLoading(sessionId !== null);
     setLoadError(null);
     if (loadedFor.sessionId !== sessionId) {
-      // Documents of a different session must never be shown.
+      // Documents and uploads of a different session must never be shown.
       setDocuments([]);
-      setIsUploading(false);
-      setUploadError(null);
+      setUploads([]);
     }
   }
 
@@ -94,46 +116,68 @@ export function useDocuments(
     return () => controller.abort();
   }, [sessionId, reloadCount]);
 
-  // Abort an in-flight upload when the session changes or the component unmounts.
-  useEffect(
-    () => () => {
-      uploadControllerRef.current?.abort();
-      uploadControllerRef.current = null;
-    },
-    [sessionId],
-  );
+  // Abort in-flight uploads when the session changes or the component unmounts.
+  useEffect(() => {
+    const controllers = uploadControllersRef.current;
+    return () => {
+      for (const controller of controllers.values()) {
+        controller.abort();
+      }
+      controllers.clear();
+    };
+  }, [sessionId]);
 
   const reload = useCallback(() => setReloadCount((count) => count + 1), []);
-  const dismissUploadError = useCallback(() => setUploadError(null), []);
+
+  const dismissUpload = useCallback((uploadId: string) => {
+    setUploads((current) => current.filter((item) => item.id !== uploadId || item.phase !== "failed"));
+  }, []);
 
   const upload = useCallback(
-    async (files: File[]) => {
-      if (sessionId === null || files.length === 0 || uploadControllerRef.current !== null) {
+    (files: File[]) => {
+      if (sessionId === null) {
         return;
       }
-      const controller = new AbortController();
-      uploadControllerRef.current = controller;
-      setIsUploading(true);
-      setUploadError(null);
+      for (const file of files) {
+        uploadCountRef.current += 1;
+        const uploadId = `upload-${uploadCountRef.current}`;
+        const controller = new AbortController();
+        uploadControllersRef.current.set(uploadId, controller);
 
-      try {
-        const response = await uploadDocuments(sessionId, files, controller.signal);
-        setDocuments((current) => mergeDocuments(current, response.documents));
-      } catch (error) {
-        if (controller.signal.aborted || isAbortError(error)) {
-          return;
-        }
-        if (isSessionNotFound(error)) {
-          onSessionNotFoundRef.current(sessionId);
-          return;
-        }
-        setUploadError(getUserFacingErrorMessage(error));
-      } finally {
-        // When the session changed meanwhile, the session reset already cleared this state.
-        if (uploadControllerRef.current === controller) {
-          uploadControllerRef.current = null;
-          setIsUploading(false);
-        }
+        const updateUpload = (changes: Partial<FileUpload>) =>
+          setUploads((current) => current.map((item) => (item.id === uploadId ? { ...item, ...changes } : item)));
+
+        setUploads((current) => [
+          ...current,
+          { id: uploadId, fileName: file.name, sizeBytes: file.size, phase: "uploading", progress: 0, error: null },
+        ]);
+
+        uploadDocument(sessionId, file, {
+          signal: controller.signal,
+          onUploadProgress: (fraction) =>
+            updateUpload(fraction >= 1 ? { phase: "processing", progress: 1 } : { progress: fraction }),
+        })
+          .then((document) => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            setUploads((current) => current.filter((item) => item.id !== uploadId));
+            setDocuments((current) => mergeDocuments(current, [document]));
+          })
+          .catch((error: unknown) => {
+            if (controller.signal.aborted || isAbortError(error)) {
+              return;
+            }
+            if (isSessionNotFound(error)) {
+              // The session reset clears this row along with the old session's state.
+              onSessionNotFoundRef.current(sessionId);
+              return;
+            }
+            updateUpload({ phase: "failed", error: getUserFacingErrorMessage(error) });
+          })
+          .finally(() => {
+            uploadControllersRef.current.delete(uploadId);
+          });
       }
     },
     [sessionId],
@@ -144,9 +188,10 @@ export function useDocuments(
     isLoading,
     loadError,
     reload,
-    isUploading,
-    uploadError,
-    dismissUploadError,
+    uploads,
+    processingCount: uploads.filter((item) => item.phase !== "failed").length,
+    hasReadableDocuments: documents.some((document) => READABLE_STATUSES.includes(document.status)),
     upload,
+    dismissUpload,
   };
 }
