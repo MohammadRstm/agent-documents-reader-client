@@ -1,0 +1,36 @@
+.list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.placeholder {
+  flex: 1;
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.pending {
+  align-self: flex-start;
+  max-width: 85%;
+  padding: 10px 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.status {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.draft {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
