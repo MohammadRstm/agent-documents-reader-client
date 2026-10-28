@@ -118,6 +118,26 @@ describe("readSseStream", () => {
 
     expect(events.map((event) => event.event)).toEqual(["status", "done"]);
   });
+
+  it("stops delivering events and rejects with an AbortError when aborted", async () => {
+    const encoder = new TextEncoder();
+    let streamController!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    });
+    const abortController = new AbortController();
+    const events: RawSseEvent[] = [];
+
+    const reading = readSseStream(stream, (event) => events.push(event), abortController.signal);
+    streamController.enqueue(encoder.encode(DELTA_EVENT));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    abortController.abort();
+
+    await expect(reading).rejects.toMatchObject({ name: "AbortError" });
+    expect(events.map((event) => event.event)).toEqual(["delta"]);
+  });
 });
 
 describe("parseChatEvent", () => {

@@ -3,11 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import {
   ApiError,
   createSession,
+  getChatHistory,
   getUserFacingErrorMessage,
   isAbortError,
   listDocuments,
+  streamChat,
   uploadDocuments,
 } from "./client";
+import type { ChatStreamEvent } from "./types";
 
 const SESSION_ID = "a".repeat(43);
 
@@ -202,5 +205,81 @@ describe("getUserFacingErrorMessage", () => {
     expect(getUserFacingErrorMessage(new Error("NullReferenceException in Foo.Bar"))).toBe(
       "Something went wrong. Please try again.",
     );
+  });
+});
+
+describe("streamChat", () => {
+  function eventStreamResponse(text: string, contentType = "text/event-stream"): Response {
+    return new Response(text, { status: 200, headers: { "Content-Type": contentType } });
+  }
+
+  it("posts the question as JSON with the session header", async () => {
+    fetchMock.mockResolvedValue(
+      eventStreamResponse('event: done\ndata: {"messageId":"m1","answer":"Hi","incomplete":false}\n\n'),
+    );
+
+    await streamChat(SESSION_ID, "What is the total?", () => {});
+
+    const { url, init } = lastRequest();
+    expect(url).toBe("/api/chat");
+    expect(init.method).toBe("POST");
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-Session-Id")).toBe(SESSION_ID);
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(JSON.parse(String(init.body))).toEqual({ question: "What is the total?" });
+  });
+
+  it("passes valid events in order and skips malformed and unknown ones", async () => {
+    fetchMock.mockResolvedValue(
+      eventStreamResponse(
+        [
+          'event: status\ndata: {"message":"Searching documents…","tool":"search_text"}\n\n',
+          'event: delta\ndata: {"text":\n\n',
+          "event: ping\ndata: {}\n\n",
+          'event: delta\ndata: {"text":"Hello"}\n\n',
+          'event: done\ndata: {"messageId":"m1","answer":"Hello","incomplete":false}\n\n',
+        ].join(""),
+      ),
+    );
+    const events: ChatStreamEvent[] = [];
+
+    await streamChat(SESSION_ID, "Hi", (event) => events.push(event));
+
+    expect(events.map((event) => event.event)).toEqual(["status", "delta", "done"]);
+  });
+
+  it("throws the contract error when the request is rejected before streaming", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: "question_in_progress", message: "Please wait for the current answer.", traceId: "t" }, 409),
+    );
+
+    const error = (await captureError(streamChat(SESSION_ID, "Hi", () => {}))) as ApiError;
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.code).toBe("question_in_progress");
+    expect(error.message).toBe("Please wait for the current answer.");
+  });
+
+  it("rejects a successful response that is not an event stream", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ answer: "Hi" }));
+
+    const error = (await captureError(streamChat(SESSION_ID, "Hi", () => {}))) as ApiError;
+
+    expect(error.code).toBe("unexpected_response");
+  });
+});
+
+describe("getChatHistory", () => {
+  it("returns the messages for the session", async () => {
+    const messages = [
+      { id: "m1", role: "user", content: "Hi", createdAt: "2026-10-28T12:00:00Z", citations: [], incomplete: false },
+    ];
+    fetchMock.mockResolvedValue(jsonResponse({ messages }));
+
+    const result = await getChatHistory(SESSION_ID);
+
+    expect(result.messages).toEqual(messages);
+    expect(lastRequest().url).toBe("/api/chat/history");
+    expect(new Headers(lastRequest().init.headers).get("X-Session-Id")).toBe(SESSION_ID);
   });
 });

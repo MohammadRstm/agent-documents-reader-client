@@ -1,6 +1,10 @@
+import { parseChatEvent, readSseStream } from "./sse";
 import type {
   ApiErrorCode,
   ApiErrorResponse,
+  ChatHistoryResponse,
+  ChatRequest,
+  ChatStreamEvent,
   CreateSessionResponse,
   DocumentsResponse,
   EvidenceDetail,
@@ -267,4 +271,52 @@ export async function getEvidence(
     throw unexpectedResponse(response.status);
   }
   return body as unknown as EvidenceDetail;
+}
+
+/** `GET /api/chat/history` (oldest message first). */
+export async function getChatHistory(sessionId: string, signal?: AbortSignal): Promise<ChatHistoryResponse> {
+  const response = await sendApiRequest("/chat/history", { sessionId, signal });
+  const body = await readJson(response);
+  if (!isRecord(body) || !Array.isArray(body.messages)) {
+    throw unexpectedResponse(response.status);
+  }
+  return body as unknown as ChatHistoryResponse;
+}
+
+/**
+ * `POST /api/chat`. Errors before the stream starts (validation, session,
+ * `question_in_progress`, rate limits, ...) are thrown as ApiError. Once streaming,
+ * every valid contract event is passed to `onEvent`; malformed and unknown events are
+ * skipped. Resolves when the server closes the stream.
+ */
+export async function streamChat(
+  sessionId: string,
+  question: string,
+  onEvent: (event: ChatStreamEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const request: ChatRequest = { question };
+  const response = await sendApiRequest("/chat", {
+    method: "POST",
+    sessionId,
+    body: JSON.stringify(request),
+    headers: { "Content-Type": "application/json" },
+    signal,
+  });
+
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.toLowerCase().startsWith("text/event-stream") || response.body === null) {
+    throw unexpectedResponse(response.status);
+  }
+
+  await readSseStream(
+    response.body,
+    (rawEvent) => {
+      const parsed = parseChatEvent(rawEvent);
+      if (parsed.kind === "event") {
+        onEvent(parsed.value);
+      }
+    },
+    signal,
+  );
 }
