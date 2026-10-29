@@ -60,6 +60,15 @@ const FILE_TYPE_LABELS: Record<FileType, string> = {
   unknown: "Unknown type",
 };
 
+/** Short labels for the decorative file-type tile; the full type is in the details line. */
+const FILE_TYPE_TILES: Record<FileType, string> = {
+  pdf: "PDF",
+  xlsx: "XLSX",
+  xlsm: "XLSM",
+  xls: "XLS",
+  unknown: "?",
+};
+
 function describeContents(document: DocumentSummary): string | null {
   if (document.pageCount !== null) {
     return document.pageCount === 1 ? "1 page" : `${document.pageCount} pages`;
@@ -80,21 +89,26 @@ function DocumentItem({ document }: { document: DocumentSummary }) {
 
   return (
     <li className={styles.item}>
-      <div className={styles.itemHeader}>
-        <span className={styles.fileName} title={document.fileName}>
-          {document.fileName}
-        </span>
-        <span className={`${styles.badge} ${styles[status.tone]}`}>{status.label}</span>
+      <span className={`${styles.typeTile} ${styles[`tile-${status.tone}`]}`} aria-hidden="true">
+        {FILE_TYPE_TILES[document.fileType] ?? FILE_TYPE_TILES.unknown}
+      </span>
+      <div className={styles.body}>
+        <div className={styles.itemHeader}>
+          <span className={styles.fileName} title={document.fileName}>
+            {document.fileName}
+          </span>
+          <span className={`${styles.badge} ${styles[status.tone]}`}>{status.label}</span>
+        </div>
+        <p className={styles.details}>{details}</p>
+        {status.description && <p className={styles.statusDescription}>{status.description}</p>}
+        {document.warnings.length > 0 && (
+          <ul className={styles.warnings} aria-label={`Warnings for ${document.fileName}`}>
+            {document.warnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        )}
       </div>
-      <p className={styles.details}>{details}</p>
-      {status.description && <p className={styles.statusDescription}>{status.description}</p>}
-      {document.warnings.length > 0 && (
-        <ul className={styles.warnings} aria-label={`Warnings for ${document.fileName}`}>
-          {document.warnings.map((warning, index) => (
-            <li key={index}>{warning}</li>
-          ))}
-        </ul>
-      )}
     </li>
   );
 }
@@ -112,9 +126,11 @@ export function DocumentList({ documents, isLoading, error, onRetry }: DocumentL
   } else if (documents.length === 0) {
     content = <p className={styles.placeholder}>No documents uploaded yet.</p>;
   } else {
+    // Documents arrive in upload order (as the API returns them); show the newest first.
+    const newestFirst = [...documents].reverse();
     content = (
       <ul className={styles.list} aria-label="Uploaded documents">
-        {documents.map((document) => (
+        {newestFirst.map((document) => (
           <DocumentItem key={document.id} document={document} />
         ))}
       </ul>

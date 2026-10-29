@@ -1,69 +1,113 @@
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  gap: 16px;
+  max-width: 1680px;
+  height: 100dvh;
+  margin: 0 auto;
+  padding: 16px 20px 20px;
 }
 
 .header {
   display: flex;
-  align-items: baseline;
-  gap: 16px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  align-items: center;
+  gap: 12px;
+  padding: 2px 4px;
+}
+
+.brandMark {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: linear-gradient(160deg, var(--color-surface-raised), var(--color-surface));
+  box-shadow: 0 1px 0 var(--color-highlight) inset;
+  color: var(--color-accent);
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.tagline {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.8rem;
 }
 
 .sessionStatus {
-  margin: 0;
+  margin: 0 0 0 auto;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
   color: var(--color-muted);
-  font-size: 0.9rem;
+  font-size: 0.78rem;
 }
 
 .banners {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 20px 0;
 }
 
 .main {
   display: grid;
   flex: 1;
-  grid-template-columns: minmax(280px, 360px) 1fr;
+  grid-template-columns: minmax(300px, 370px) minmax(0, 1fr);
+  gap: 16px;
   min-height: 0;
 }
 
+.withSource {
+  grid-template-columns: minmax(300px, 370px) minmax(0, 1fr) minmax(300px, 400px);
+}
+
+/* The panels share one card treatment: a hairline core inside a faint outer bezel. */
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 16px 20px;
-  border-right: 1px solid var(--color-border);
+  gap: 26px;
+  min-height: 0;
+  padding: 20px;
   overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
 }
 
-.withSource {
-  grid-template-columns: minmax(280px, 360px) 1fr minmax(280px, 380px);
+@media (max-width: 1280px) {
+  .withSource {
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr) minmax(270px, 340px);
+  }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .app {
     height: auto;
-    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 12px 16px 16px;
   }
 
   .main,
   .withSource {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .sidebar {
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
+  .tagline {
+    display: none;
   }
 }

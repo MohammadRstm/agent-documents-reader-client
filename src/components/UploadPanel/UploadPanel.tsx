@@ -89,6 +89,12 @@ export function UploadPanel({ onUpload, disabled, uploads, onDismissUpload }: Up
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        <span className={styles.dropIcon} aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M4.5 14.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" strokeLinecap="round" />
+          </svg>
+        </span>
         <p className={styles.hint}>Drag and drop PDF or Excel files here, or</p>
         <button
           type="button"

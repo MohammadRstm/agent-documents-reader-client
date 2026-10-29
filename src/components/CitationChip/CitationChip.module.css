@@ -5,26 +5,32 @@
   max-width: 100%;
   margin: 0 2px;
   padding: 0 6px;
-  border: 1px solid var(--color-accent);
-  border-radius: 4px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-small);
   background: var(--color-accent-bg);
   color: var(--color-accent);
-  font: inherit;
-  font-size: 0.8em;
-  font-weight: 600;
-  line-height: 1.6;
+  font-family: var(--font-mono);
+  font-size: 0.74em;
+  font-weight: 500;
+  line-height: 1.7;
   vertical-align: baseline;
   cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-spring),
+    color var(--duration-fast) var(--ease-spring),
+    border-color var(--duration-fast) var(--ease-spring);
 }
 
 .chip:hover,
 .chip:focus-visible {
+  border-color: var(--color-accent);
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-on-accent);
 }
 
 .details {
   overflow: hidden;
+  font-family: var(--font-sans);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;

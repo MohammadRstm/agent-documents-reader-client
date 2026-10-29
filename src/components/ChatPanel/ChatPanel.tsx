@@ -95,27 +95,37 @@ export function ChatPanel({
         <label htmlFor="chat-question" className={styles.visuallyHidden}>
           Your question
         </label>
-        <textarea
-          id="chat-question"
-          className={styles.input}
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={handleKeyDown}
-          maxLength={MAX_QUESTION_LENGTH}
-          rows={3}
-          placeholder="Ask a question about your documents…"
-          disabled={isInputDisabled}
-          aria-describedby={blockedReason !== null ? "chat-blocked-reason" : undefined}
-        />
-        <div className={styles.actions}>
-          {isStreaming && (
-            <button type="button" className={styles.secondaryButton} onClick={onCancel}>
-              Cancel
+        <div className={`${styles.composer} ${isInputDisabled ? styles.composerDisabled : ""}`}>
+          <textarea
+            id="chat-question"
+            className={styles.input}
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={handleKeyDown}
+            maxLength={MAX_QUESTION_LENGTH}
+            rows={3}
+            placeholder="Ask a question about your documents…"
+            disabled={isInputDisabled}
+            aria-describedby={blockedReason !== null ? "chat-blocked-reason" : undefined}
+          />
+          <div className={styles.actions}>
+            <span className={styles.keyHint} aria-hidden="true">
+              Enter to send · Shift+Enter for a new line
+            </span>
+            {isStreaming && (
+              <button type="button" className={styles.secondaryButton} onClick={onCancel}>
+                Cancel
+              </button>
+            )}
+            <button type="submit" className={styles.primaryButton} disabled={!canSend}>
+              Send
+              <span className={styles.sendIcon} aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M5 12h13M13 6.5 18.5 12 13 17.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
             </button>
-          )}
-          <button type="submit" className={styles.primaryButton} disabled={!canSend}>
-            Send
-          </button>
+          </div>
         </div>
       </form>
     </section>

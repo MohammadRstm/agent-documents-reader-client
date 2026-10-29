@@ -1,18 +1,30 @@
 .message {
-  max-width: 85%;
-  padding: 10px 14px;
-  border-radius: 8px;
+  max-width: min(85%, 72ch);
+  animation: messageEnter 420ms var(--ease-spring);
+}
+
+@keyframes messageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .user {
   align-self: flex-end;
+  padding: 10px 15px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-panel) var(--radius-panel) 4px var(--radius-panel);
   background: var(--color-accent-bg);
 }
 
 .assistant {
   align-self: flex-start;
+  padding: 14px 16px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-radius: 4px var(--radius-panel) var(--radius-panel) var(--radius-panel);
+  background: var(--color-surface-raised);
+  box-shadow: 0 1px 0 var(--color-highlight) inset;
 }
 
 .userText {
@@ -22,23 +34,33 @@
 }
 
 .incomplete {
-  margin: 8px 0 0;
-  padding: 4px 8px;
-  border-radius: 4px;
+  margin: 12px 0 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-small);
   background: var(--color-warning-bg);
   color: var(--color-warning-text);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .sources {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin-top: 8px;
-  font-size: 0.85rem;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.82rem;
 }
 
 .sourcesLabel {
-  color: var(--color-muted);
+  margin-right: 2px;
+  color: var(--color-subtle);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 760px) {
+  .message {
+    max-width: 100%;
+  }
 }
