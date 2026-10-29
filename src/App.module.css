@@ -47,22 +47,8 @@
   overflow-y: auto;
 }
 
-.chatArea {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 20px;
-  overflow-y: auto;
-}
-
-.chatHeading {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.chatPlaceholder {
-  margin: 0;
-  color: var(--color-muted);
+.withSource {
+  grid-template-columns: minmax(280px, 360px) 1fr minmax(280px, 380px);
 }
 
 @media (max-width: 720px) {
@@ -71,7 +57,8 @@
     min-height: 100vh;
   }
 
-  .main {
+  .main,
+  .withSource {
     grid-template-columns: 1fr;
   }
 

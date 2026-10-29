@@ -1,16 +1,14 @@
 # agent-documents-reader-client
 
 React frontend for the AI document-analysis assistant. Users upload PDF and Excel
-documents and (in a later step) ask questions about them in a chat interface. The
-backend is the separate ASP.NET Core project `agent-documents-reader-server`.
-
-> Status: work in progress. Session handling, document upload and the document list
-> are implemented. The chat is not available yet.
+documents, ask questions about them in a chat interface, and inspect the sources
+(PDF pages, Excel cell ranges) behind every answer.
+The backend is the separate ASP.NET Core project `agent-documents-reader-server`.
 
 ## Stack
 
 - Vite + React + TypeScript, plain CSS modules
-- `react-markdown` + `remark-gfm` (for answers, used in a later step)
+- `react-markdown` + `remark-gfm` for answers (raw HTML is never rendered)
 - Vitest + React Testing Library (jsdom) for tests
 - oxlint for linting (shipped by the current `create-vite` React + TypeScript template)
 
@@ -39,9 +37,10 @@ pull request and on pushes to `develop` and `main`.
 ```
 docs/api-contract.md   Shared API contract with the server (keep both copies identical)
 src/api/               Fetch wrapper, typed API errors, SSE parser, contract types
-src/hooks/             useSession, useDocuments
-src/components/        UploadPanel, DocumentList, ErrorBanner
-src/utils/             Small helpers (file extensions, file sizes)
+src/hooks/             useSession, useDocuments, useChat, useEvidence
+src/components/        UploadPanel, DocumentList, ChatPanel, MessageList, MessageItem,
+                       AnswerMarkdown, CitationChip, SourcePanel, ErrorBanner
+src/utils/             Small helpers (file extensions, file sizes, source locations)
 ```
 
 ## Behaviour notes
@@ -51,5 +50,13 @@ src/utils/             Small helpers (file extensions, file sizes)
   previous documents and chat are no longer available.
 - The upload panel only offers `.pdf`, `.xlsx`, `.xlsm` and `.xls`. This is a convenience
   check; the server validates every file.
+- Chat answers stream over server-sent events read from `fetch` (`POST /api/chat`).
+  The streamed draft is shown as plain text with the latest progress message; the final
+  `done` answer replaces it. Malformed or unknown events are skipped. A stream that ends
+  without `done` or `error` shows a generic error. Answers can be cancelled.
+- Answers are rendered with `react-markdown` + `remark-gfm` with raw HTML skipped and
+  images shown only for absolute http(s) URLs (lazy, no referrer). `[E12]` markers become clickable source chips only when the backend
+  sent a matching citation; clicking one opens the source panel (file, page or sheet and
+  range, snippet, and the full text from `GET /api/evidence/{id}`).
 - Error messages shown to users come from the contract's safe `message` field or from
   generic client messages. Raw server output is never displayed.

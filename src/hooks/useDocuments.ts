@@ -80,7 +80,7 @@ export function useDocuments(
         setIsLoading(false);
       })
       .catch((error: unknown) => {
-        if (isAbortError(error)) {
+        if (controller.signal.aborted || isAbortError(error)) {
           return;
         }
         setIsLoading(false);
@@ -120,7 +120,7 @@ export function useDocuments(
         const response = await uploadDocuments(sessionId, files, controller.signal);
         setDocuments((current) => mergeDocuments(current, response.documents));
       } catch (error) {
-        if (isAbortError(error)) {
+        if (controller.signal.aborted || isAbortError(error)) {
           return;
         }
         if (isSessionNotFound(error)) {

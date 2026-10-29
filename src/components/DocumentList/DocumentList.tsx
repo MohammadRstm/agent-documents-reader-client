@@ -36,7 +36,7 @@ const STATUS_DISPLAY: Record<DocumentStatus, { label: string; tone: StatusTone; 
     tone: "failure",
     description: "The file is damaged, encrypted, or could not be opened.",
   },
-  tooLarge: { label: "Too large", tone: "failure", description: "The file exceeds the maximum allowed size." },
+  tooLarge: { label: "Too large", tone: "failure", description: "The file is too large to process." },
 };
 
 const UNKNOWN_STATUS = { label: "Unknown status", tone: "warning" as const, description: null };

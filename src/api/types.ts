@@ -10,7 +10,7 @@ export type DocumentStatus =
   | "empty" // valid file with no content
   | "unsupported" // file signature/extension not a supported type
   | "corrupt" // recognized type but unreadable or encrypted
-  | "tooLarge"; // single file over the per-file size limit
+  | "tooLarge"; // over the per-file size limit, or too large to process once uncompressed (Excel)
 
 export interface SheetSummary {
   name: string;

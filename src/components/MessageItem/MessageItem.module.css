@@ -1,0 +1,44 @@
+.message {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.user {
+  align-self: flex-end;
+  background: var(--color-accent-bg);
+}
+
+.assistant {
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.userText {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.incomplete {
+  margin: 8px 0 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  font-size: 0.85rem;
+}
+
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.sourcesLabel {
+  color: var(--color-muted);
+}

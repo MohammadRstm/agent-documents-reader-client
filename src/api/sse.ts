@@ -105,18 +105,33 @@ export class SseParser {
 /**
  * Reads a byte stream to the end, decoding UTF-8 incrementally (multi-byte
  * characters may be split across chunks) and passing each complete event to `onEvent`.
- * Cancelling the fetch's AbortSignal makes the pending read reject with an AbortError.
+ * When `signal` is aborted the stream is cancelled, no further events are delivered
+ * and the returned promise rejects with an AbortError.
  */
 export async function readSseStream(
   stream: ReadableStream<Uint8Array>,
   onEvent: (event: RawSseEvent) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const reader = stream.getReader();
   const decoder = new TextDecoder("utf-8");
-  const parser = new SseParser(onEvent);
+  const parser = new SseParser((event) => {
+    if (!signal?.aborted) {
+      onEvent(event);
+    }
+  });
+  const cancelStream = () => {
+    reader.cancel().catch(() => {
+      // The stream may already be closed or errored; nothing else to clean up.
+    });
+  };
+  signal?.addEventListener("abort", cancelStream);
+
   try {
     for (;;) {
+      throwIfAborted(signal);
       const { done, value } = await reader.read();
+      throwIfAborted(signal);
       if (done) {
         break;
       }
@@ -125,7 +140,14 @@ export async function readSseStream(
     parser.push(decoder.decode());
     parser.end();
   } finally {
+    signal?.removeEventListener("abort", cancelStream);
     reader.releaseLock();
+  }
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw new DOMException("The stream was aborted.", "AbortError");
   }
 }
 
