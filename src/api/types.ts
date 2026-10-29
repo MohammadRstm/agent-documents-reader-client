@@ -73,6 +73,8 @@ export type ApiErrorCode =
   | "session_not_found"
   | "evidence_not_found"
   | "question_in_progress"
+  | "documents_processing"
+  | "no_documents"
   | "payload_too_large"
   | "unsupported_media_type"
   | "rate_limited"

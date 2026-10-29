@@ -3,13 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { UploadPanel } from "./UploadPanel";
 
-function renderPanel(overrides: Partial<Parameters<typeof UploadPanel>[0]> = {}) {
-  const props = {
+type UploadPanelProps = Parameters<typeof UploadPanel>[0];
+
+function renderPanel(overrides: Partial<UploadPanelProps> = {}) {
+  const props: UploadPanelProps = {
     onUpload: vi.fn(),
-    isUploading: false,
     disabled: false,
-    error: null,
-    onDismissError: vi.fn(),
+    uploads: [],
+    onDismissUpload: vi.fn(),
     ...overrides,
   };
   render(<UploadPanel {...props} />);
@@ -77,15 +78,21 @@ describe("UploadPanel", () => {
     expect(props.onUpload).toHaveBeenCalledWith([file]);
   });
 
-  it("shows progress and blocks new uploads while uploading", () => {
-    const props = renderPanel({ isUploading: true });
+  it("keeps accepting files while earlier uploads are still in progress", () => {
+    const props = renderPanel({
+      uploads: [
+        { id: "u1", fileName: "first.pdf", sizeBytes: 1000, phase: "uploading", progress: 0.4, error: null },
+        { id: "u2", fileName: "second.xlsx", sizeBytes: 2000, phase: "processing", progress: 1, error: null },
+      ],
+    });
+    const file = pdf();
 
-    expect(screen.getByRole("status")).toHaveTextContent(/uploading and processing files/i);
-    expect(screen.getByRole("button", { name: "Choose files" })).toBeDisabled();
-    expect(screen.getByLabelText("Choose files to upload")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Choose files" })).toBeEnabled();
+    fireEvent.drop(screen.getByTestId("upload-drop-zone"), { dataTransfer: { files: [file] } });
 
-    fireEvent.drop(screen.getByTestId("upload-drop-zone"), { dataTransfer: { files: [pdf()] } });
-    expect(props.onUpload).not.toHaveBeenCalled();
+    expect(props.onUpload).toHaveBeenCalledWith([file]);
+    expect(screen.getByRole("progressbar", { name: "Uploading first.pdf" })).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Parsing second.xlsx" })).toBeInTheDocument();
   });
 
   it("is disabled while no session is available", () => {
@@ -96,13 +103,23 @@ describe("UploadPanel", () => {
     expect(props.onUpload).not.toHaveBeenCalled();
   });
 
-  it("shows an upload error that can be dismissed", async () => {
+  it("lets the user dismiss a failed upload row", async () => {
     const user = userEvent.setup();
-    const props = renderPanel({ error: "The request is too large. Try uploading fewer or smaller files." });
+    const props = renderPanel({
+      uploads: [
+        {
+          id: "u1",
+          fileName: "huge.pdf",
+          sizeBytes: 999,
+          phase: "failed",
+          progress: 1,
+          error: "The file is too large.",
+        },
+      ],
+    });
 
-    expect(screen.getByRole("alert")).toHaveTextContent("The request is too large.");
-
-    await user.click(screen.getByRole("button", { name: "Dismiss message" }));
-    expect(props.onDismissError).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("Upload failed. The file is too large.");
+    await user.click(screen.getByRole("button", { name: "Dismiss failed upload of huge.pdf" }));
+    expect(props.onDismissUpload).toHaveBeenCalledWith("u1");
   });
 });

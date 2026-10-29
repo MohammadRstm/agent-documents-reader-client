@@ -90,4 +90,25 @@ describe("DocumentList", () => {
     expect(container.querySelector("b")).toBeNull();
     expect(screen.getByText("<b>bold</b>")).toBeInTheDocument();
   });
+
+  it.each([
+    ["unsupported", "Only PDF and Excel files (.pdf, .xlsx, .xlsm, .xls) are supported."],
+    ["corrupt", /try re-exporting or re-saving it/i],
+    ["tooLarge", /split it into smaller files/i],
+    ["empty", /contains no content/i],
+    ["noTextExtracted", /scanned documents \(OCR\) are not supported/i],
+    ["partiallyIndexed", /answers may miss part of this document/i],
+  ] as const)("tells the user what to do for status %s", (status, expected) => {
+    render(
+      <DocumentList
+        documents={[makeDocument({ status, warnings: ["Server warning for this file."] })]}
+        isLoading={false}
+        error={null}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.getByText("Server warning for this file.")).toBeInTheDocument();
+  });
 });

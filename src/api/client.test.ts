@@ -8,7 +8,6 @@ import {
   isAbortError,
   listDocuments,
   streamChat,
-  uploadDocuments,
 } from "./client";
 import type { ChatStreamEvent } from "./types";
 
@@ -76,28 +75,6 @@ describe("session header", () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).code).toBe("unexpected_response");
-  });
-});
-
-describe("uploadDocuments", () => {
-  it("posts every file as a 'files' part without a manual Content-Type header", async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ documents: [] }));
-    const files = [
-      new File(["%PDF-1.7"], "contract.pdf", { type: "application/pdf" }),
-      new File(["data"], "boq.xlsx"),
-    ];
-
-    await uploadDocuments(SESSION_ID, files);
-
-    const { url, init } = lastRequest();
-    expect(url).toBe("/api/documents");
-    expect(init.method).toBe("POST");
-    const headers = new Headers(init.headers);
-    expect(headers.get("X-Session-Id")).toBe(SESSION_ID);
-    expect(headers.has("Content-Type")).toBe(false);
-    const body = init.body as FormData;
-    expect(body).toBeInstanceOf(FormData);
-    expect((body.getAll("files") as File[]).map((file) => file.name)).toEqual(["contract.pdf", "boq.xlsx"]);
   });
 });
 

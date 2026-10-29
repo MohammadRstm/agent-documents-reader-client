@@ -18,25 +18,36 @@ const STATUS_DISPLAY: Record<DocumentStatus, { label: string; tone: StatusTone; 
   partiallyIndexed: {
     label: "Partially indexed",
     tone: "warning",
-    description: "Some content could not be read. Answers may not cover the whole document.",
+    description:
+      "Some pages or sheets could not be read or were cut off by size limits, so answers may miss part of this document. See the warnings for details.",
   },
   noTextExtracted: {
     label: "No text found",
     tone: "warning",
-    description: "No readable text was found. The PDF may be scanned; its content cannot be searched.",
+    description:
+      "No selectable text was found. This PDF looks scanned, and scanned documents (OCR) are not supported. Upload a PDF with selectable text instead.",
   },
-  empty: { label: "Empty", tone: "warning", description: "The file contains no content." },
+  empty: {
+    label: "Empty",
+    tone: "warning",
+    description: "The file contains no content to analyse. Check that you uploaded the right file.",
+  },
   unsupported: {
     label: "Unsupported",
     tone: "failure",
-    description: "This file is not a supported PDF or Excel document.",
+    description: "Only PDF and Excel files (.pdf, .xlsx, .xlsm, .xls) are supported.",
   },
   corrupt: {
     label: "Unreadable",
     tone: "failure",
-    description: "The file is damaged, encrypted, or could not be opened.",
+    description:
+      "The file is damaged, password-protected or could not be opened. Try re-exporting or re-saving it without a password, then upload it again.",
   },
-  tooLarge: { label: "Too large", tone: "failure", description: "The file is too large to process." },
+  tooLarge: {
+    label: "Too large",
+    tone: "failure",
+    description: "The file is too large to process. Split it into smaller files or remove unneeded pages or sheets, then upload it again.",
+  },
 };
 
 const UNKNOWN_STATUS = { label: "Unknown status", tone: "warning" as const, description: null };
