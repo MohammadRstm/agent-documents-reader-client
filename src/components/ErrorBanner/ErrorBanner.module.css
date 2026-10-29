@@ -1,0 +1,43 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.error {
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
+  color: var(--color-error-text);
+}
+
+.notice {
+  background: var(--color-notice-bg);
+  border-color: var(--color-notice-border);
+  color: var(--color-notice-text);
+}
+
+.message {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.button {
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
