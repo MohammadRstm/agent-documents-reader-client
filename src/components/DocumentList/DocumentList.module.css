@@ -1,0 +1,85 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.heading {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.placeholder {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.fileName {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.success {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.failure {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+.details,
+.statusDescription {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.warnings {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: var(--color-warning-text);
+}
