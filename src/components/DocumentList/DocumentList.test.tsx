@@ -68,13 +68,31 @@ describe("DocumentList", () => {
 
     render(<DocumentList documents={documents} isLoading={false} error={null} onRetry={vi.fn()} />);
 
+    // Newest first: the last uploaded document is at the top.
     const items = Array.from(screen.getByRole("list", { name: "Uploaded documents" }).children) as HTMLElement[];
     expect(items).toHaveLength(3);
-    expect(within(items[0]).getByText("Indexed")).toBeInTheDocument();
-    expect(within(items[0]).getByText(/12 pages/)).toBeInTheDocument();
+    expect(within(items[0]).getByText(/2 sheets: Summary, BOQ/)).toBeInTheDocument();
     expect(within(items[1]).getByText("No text found")).toBeInTheDocument();
     expect(within(items[1]).getByText(/possibly scanned/)).toBeInTheDocument();
-    expect(within(items[2]).getByText(/2 sheets: Summary, BOQ/)).toBeInTheDocument();
+    expect(within(items[2]).getByText("Indexed")).toBeInTheDocument();
+    expect(within(items[2]).getByText(/12 pages/)).toBeInTheDocument();
+  });
+
+  it("lists the most recently uploaded document first", () => {
+    const documents = [
+      makeDocument({ id: "doc-1", fileName: "first.pdf" }),
+      makeDocument({ id: "doc-2", fileName: "second.pdf" }),
+      makeDocument({ id: "doc-3", fileName: "third.pdf" }),
+    ];
+
+    render(<DocumentList documents={documents} isLoading={false} error={null} onRetry={vi.fn()} />);
+
+    const items = Array.from(screen.getByRole("list", { name: "Uploaded documents" }).children) as HTMLElement[];
+    expect(items.map((item) => within(item).getByTitle(/\.pdf$/).textContent)).toEqual([
+      "third.pdf",
+      "second.pdf",
+      "first.pdf",
+    ]);
   });
 
   it("renders file names and warnings as text, not HTML", () => {

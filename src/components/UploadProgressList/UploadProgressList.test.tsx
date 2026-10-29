@@ -24,6 +24,17 @@ describe("UploadProgressList", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("lists the most recently started upload first", () => {
+    render(<UploadProgressList uploads={uploads} onDismiss={vi.fn()} />);
+
+    const rows = screen.getAllByRole("listitem");
+    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
+      "Upload of old.xls",
+      "Upload of boq.xlsx",
+      "Upload of contract.pdf",
+    ]);
+  });
+
   it("shows a determinate bar with the percentage while bytes are sent", () => {
     render(<UploadProgressList uploads={uploads} onDismiss={vi.fn()} />);
 
