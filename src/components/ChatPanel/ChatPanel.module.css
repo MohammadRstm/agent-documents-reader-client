@@ -1,14 +1,21 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   min-height: 0;
-  padding: 16px 20px;
+  padding: 20px 22px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
 }
 
 .heading {
   margin: 0;
-  font-size: 1rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .form {
@@ -17,43 +24,129 @@
   gap: 8px;
 }
 
+/* The question box: textarea and its actions inside one bordered field. */
+.composer {
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-shell);
+  background: var(--color-surface-sunken);
+  transition:
+    border-color var(--duration-medium) var(--ease-spring),
+    box-shadow var(--duration-medium) var(--ease-spring);
+}
+
+.composer:focus-within {
+  border-color: var(--color-accent-border);
+  box-shadow: 0 0 0 4px var(--color-accent-bg);
+}
+
+.composerDisabled {
+  opacity: 0.6;
+}
+
 .input {
+  display: block;
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font: inherit;
-  resize: vertical;
+  padding: 14px 16px 4px;
+  border: none;
+  background: transparent;
+  line-height: 1.5;
+  resize: none;
+}
+
+/* The composer shows the focus state, so the textarea itself needs no ring. */
+.input:focus-visible {
+  box-shadow: none;
+}
+
+.input::placeholder {
+  color: var(--color-subtle);
+}
+
+.input:disabled {
+  cursor: not-allowed;
 }
 
 .actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  padding: 6px 8px 8px 16px;
+}
+
+.keyHint {
+  margin-right: auto;
+  color: var(--color-subtle);
+  font-size: 0.72rem;
 }
 
 .primaryButton,
 .secondaryButton {
-  padding: 6px 16px;
-  border-radius: 4px;
-  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-spring),
+    border-color var(--duration-fast) var(--ease-spring),
+    color var(--duration-fast) var(--ease-spring),
+    transform var(--duration-fast) var(--ease-spring);
 }
 
 .primaryButton {
+  padding: 5px 5px 5px 16px;
   border: none;
   background: var(--color-accent);
-  color: #ffffff;
+  color: var(--color-on-accent);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+
+.primaryButton:active:not(:disabled),
+.secondaryButton:active {
+  transform: scale(0.97);
 }
 
 .primaryButton:disabled {
-  opacity: 0.6;
+  background: var(--color-surface-raised);
+  color: var(--color-subtle);
   cursor: not-allowed;
 }
 
+/* Trailing arrow in its own circle; it nudges forward on hover. */
+.sendIcon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(7, 18, 22, 0.14);
+  transition: transform var(--duration-medium) var(--ease-spring);
+}
+
+.primaryButton:hover:not(:disabled) .sendIcon {
+  transform: translateX(2px);
+}
+
+.primaryButton:disabled .sendIcon {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .secondaryButton {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  padding: 6px 14px;
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.secondaryButton:hover {
+  border-color: var(--color-text);
+  color: var(--color-text);
 }
 
 .visuallyHidden {
@@ -66,7 +159,32 @@
 }
 
 .blockedReason {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   color: var(--color-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+}
+
+.blockedReason::before {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-warning-text);
+  content: "";
+  animation: pulse 1.6s var(--ease-spring) infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 760px) {
+  .keyHint {
+    display: none;
+  }
 }

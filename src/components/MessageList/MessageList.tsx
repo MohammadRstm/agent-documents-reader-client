@@ -45,9 +45,20 @@ export function MessageList({
   }
   if (messages.length === 0 && pendingAnswer === null) {
     return (
-      <p className={styles.placeholder}>
-        Ask a question about your uploaded documents. Answers link to the pages and cells they are based on.
-      </p>
+      <div className={styles.emptyState}>
+        <span className={styles.emptyIcon} aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path
+              d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-7.5L7 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z"
+              strokeLinejoin="round"
+            />
+            <path d="M8 10h8M8 13h5" strokeLinecap="round" />
+          </svg>
+        </span>
+        <p className={styles.placeholder}>
+          Ask a question about your uploaded documents. Answers link to the pages and cells they are based on.
+        </p>
+      </div>
     );
   }
 

@@ -29,7 +29,7 @@ function UploadRow({ upload, onDismiss }: { upload: FileUpload; onDismiss: (uplo
             aria-valuemax={100}
             aria-valuenow={percent}
           >
-            <div className={styles.bar} style={{ width: `${percent}%` }} />
+            <div className={styles.bar} style={{ transform: `scaleX(${percent / 100})` }} />
           </div>
           <p className={styles.caption}>Uploading… {percent}%</p>
         </>
@@ -75,9 +75,11 @@ export function UploadProgressList({ uploads, onDismiss }: UploadProgressListPro
   if (uploads.length === 0) {
     return null;
   }
+  // Uploads are kept in the order they started; show the newest first, like the document list.
+  const newestFirst = [...uploads].reverse();
   return (
     <ul className={styles.list} aria-label="Uploads in progress">
-      {uploads.map((upload) => (
+      {newestFirst.map((upload) => (
         <UploadRow key={upload.id} upload={upload} onDismiss={onDismiss} />
       ))}
     </ul>

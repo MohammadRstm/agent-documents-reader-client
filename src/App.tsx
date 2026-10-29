@@ -42,7 +42,16 @@ function App() {
   return (
     <div className={styles.app}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Document Analysis Assistant</h1>
+        <span className={styles.brandMark} aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <path d="M6 3.5h8l4.5 4.5v12.5H6z" strokeLinejoin="round" />
+            <path d="M14 3.5V8h4.5M9 12.5h6M9 16h4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <div className={styles.titleGroup}>
+          <h1 className={styles.title}>Document Analysis Assistant</h1>
+          <p className={styles.tagline}>Answers from your PDF and Excel files, with the pages and cells they come from</p>
+        </div>
         {session.status === "loading" && (
           <p className={styles.sessionStatus} role="status">
             Starting session…

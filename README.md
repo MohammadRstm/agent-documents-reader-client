@@ -49,6 +49,8 @@ Tests use mocked `fetch` responses and never call the server or Claude.
 ## Stack
 
 - Vite, React 19 and TypeScript, styled with plain CSS modules.
+- A dark theme built from design tokens (colours, radii, motion) in `src/index.css`. The Geist and
+  Geist Mono fonts load from Google Fonts; without a connection the page falls back to system fonts.
 - `react-markdown` + `remark-gfm` to render answers.
 - Vitest, React Testing Library, `@testing-library/user-event`, `@testing-library/jest-dom` and jsdom for tests.
 - No UI library, state library or HTTP library: `fetch` is wrapped in `src/api/client.ts`.
@@ -110,6 +112,7 @@ A contract change must be made in both repositories in the same step, including 
   "Upload failed." with the reason and a **Dismiss** button. If the session has expired,
   the usual expiry notice appears instead.
 - More files can be added while earlier ones are still uploading or parsing.
+- Both the upload rows and the document list show the newest file first.
 - Each document shows its type, size, page count or sheet names, a status badge, a short
   explanation of what the user can do, and any warnings from the server:
 
@@ -200,8 +203,8 @@ Follow-up questions in the same conversation can refer to earlier answers.
   does not limit how many run in parallel; the server bounds parsing concurrency.
 - **Uploads cannot be cancelled from the UI.** They are aborted only when the session
   changes or the page closes. A failed file must be selected again; there is no retry button.
-- **The source panel is cramped in narrow windows.** It opens as a third column; below
-  720 px the layout stacks into one column.
+- **The source panel is narrow on small laptop screens.** It opens as a third column, and
+  the side columns shrink below 1280 px; below 760 px the layout stacks into one column.
 - **`traceId` is not shown.** Error trace IDs are kept on `ApiError` but not displayed.
 - The session lives only as long as the browser tab and the server's in-memory session.
 
